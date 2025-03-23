@@ -73,7 +73,13 @@ export async function fetchVideoPosts(
       const posts = response.data.data.children;
 
       for (const post of posts) {
+        if (post.data.pinned) {
+          console.log("Post épinglé, ignoré.");
+          continue;
+        }
+
         const video = post.data.media?.reddit_video;
+
         if (post.data.is_video && video?.hls_url) {
           const processedPost = await downloadRedditPostVideo(
             {
@@ -87,6 +93,7 @@ export async function fetchVideoPosts(
               provider: "reddit",
               subredditOrUser,
             },
+            videoPosts.map((post) => post.outputPath),
             debug,
           );
 
@@ -106,7 +113,10 @@ export async function fetchVideoPosts(
           if (videoPosts.length >= targetVideoCount) {
             break;
           }
-        } else if (post.data.media?.type === "redgifs.com") {
+        } else if (
+          post.data.media?.type === "redgifs.com" ||
+          post.data.media?.type === "v3.redgifs.com"
+        ) {
           const url = extractVideoUrlFromRedgifs(
             post.data.media.oembed.thumbnail_url,
           );
@@ -130,6 +140,7 @@ export async function fetchVideoPosts(
               provider: "redgifs",
               subredditOrUser,
             },
+            videoPosts.map((post) => post.outputPath),
             debug,
           );
 

@@ -225,6 +225,7 @@ export async function normalizeVideos(
 
         if (!debug) {
           fs.unlinkSync(inputPath);
+          fs.unlinkSync(textImageOutputPath);
         }
 
         return normalizedPost;

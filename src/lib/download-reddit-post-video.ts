@@ -2,20 +2,23 @@ import { RedditVideoPost } from "./types";
 import path from "path";
 import { createDirectoryIfNotExists, downloadFile } from "./utils";
 import ffmpeg from "fluent-ffmpeg";
+import { isDuplicateVideo } from "./duplicate";
+import fs from "fs";
 
 export async function downloadRedditPostVideo(
   post: RedditVideoPost,
+  otherVideoPaths: string[],
   debug = false,
 ) {
+  // Création du dossier du subreddit
+  const subredditDir = path.join("output", post.subredditOrUser);
+  createDirectoryIfNotExists(subredditDir);
+
+  // Nom du fichier basé sur le titre
+  const sanitizedTitle = `${post.index}_${post.title.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+  const videoOutputPath = path.join(subredditDir, `${sanitizedTitle}.mp4`);
+
   try {
-    // Création du dossier du subreddit
-    const subredditDir = path.join("output", post.subredditOrUser);
-    createDirectoryIfNotExists(subredditDir);
-
-    // Nom du fichier basé sur le titre
-    const sanitizedTitle = `${post.index}_${post.title.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
-    const videoOutputPath = path.join(subredditDir, `${sanitizedTitle}.mp4`);
-
     if (post.isHlsUrl) {
       await new Promise<void>((resolve, reject) => {
         ffmpeg(post.videoUrl)
@@ -46,6 +49,20 @@ export async function downloadRedditPostVideo(
       await downloadFile(post.videoUrl, videoOutputPath);
     }
 
+    const isDuplicate = await isDuplicateVideo(
+      videoOutputPath,
+      otherVideoPaths,
+      10,
+    );
+
+    if (isDuplicate) {
+      console.log(`Duplicate video detected: ${post.title}`);
+
+      // Suppression du fichier dupliqué
+      fs.unlinkSync(videoOutputPath);
+      return null;
+    }
+
     return {
       ...post,
       outputPath: videoOutputPath,
@@ -57,6 +74,8 @@ export async function downloadRedditPostVideo(
       post.videoUrl,
     );
 
+    // Suppression du fichier en cas d'erreur
+    fs.unlinkSync(videoOutputPath);
     return null;
   }
 }

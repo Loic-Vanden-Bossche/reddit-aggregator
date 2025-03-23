@@ -68,6 +68,7 @@ export interface RedditResponse {
           url: string;
           author: string;
           permalink: string;
+          pinned: boolean;
         };
       }>;
     };

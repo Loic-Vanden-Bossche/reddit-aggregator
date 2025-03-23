@@ -40,11 +40,39 @@ export function getVideoDuration(
 export async function findFinalResolution(
   posts: ProcessedRedditVideoPostWithMetadata[],
 ): Promise<{ width: number; height: number }> {
-  const widestAspectRatio = await findWidestAspectRatio(posts);
-  const widestVideo = await findWidestVideo(posts);
+  const widestAspectRatio = await findWidestAspectRatio(posts); // e.g., 16 / 9
+  const widestVideo = await findWidestVideo(posts); // e.g., { width: 1280, height: 720 }
+  const tallestVideo = await findTallestVideo(posts); // e.g., { width: 720, height: 1280 }
 
-  const width = Math.min(1920, widestVideo);
-  const height = Math.round(width / widestAspectRatio);
+  // Try computing height from minWidth based on the aspect ratio
+  let width = widestVideo;
+  let height = Math.round(width / widestAspectRatio);
+
+  // If computed height is less than required, recalculate width from minHeight
+  if (height < tallestVideo) {
+    height = tallestVideo;
+    width = Math.round(height * widestAspectRatio);
+  }
+
+  return { width, height };
+}
+
+export function findVideoDimensions(
+  post: ProcessedRedditVideoPostWithMetadata,
+): { width: number; height: number } | null {
+  const video = post.metadata.streams.find(
+    (stream: any) => stream.codec_type === "video",
+  );
+
+  if (!video) {
+    return null;
+  }
+
+  const { width, height } = video;
+
+  if (!width || !height) {
+    return null;
+  }
 
   return { width, height };
 }
@@ -53,19 +81,13 @@ async function findWidestAspectRatio(
   posts: ProcessedRedditVideoPostWithMetadata[],
 ): Promise<number> {
   return posts.reduce((acc, post) => {
-    const video = post.metadata.streams.find(
-      (stream: any) => stream.codec_type === "video",
-    );
+    const dimensions = findVideoDimensions(post);
 
-    if (!video) {
+    if (!dimensions) {
       return acc;
     }
 
-    const { width, height } = video;
-
-    if (!width || !height) {
-      return acc;
-    }
+    const { width, height } = dimensions;
 
     const aspectRatio = width / height;
 
@@ -92,5 +114,27 @@ async function findWidestVideo(
     }
 
     return width > acc ? width : acc;
+  }, 0);
+}
+
+async function findTallestVideo(
+  posts: ProcessedRedditVideoPostWithMetadata[],
+): Promise<number> {
+  return posts.reduce((acc, post) => {
+    const video = post.metadata.streams.find(
+      (stream: any) => stream.codec_type === "video",
+    );
+
+    if (!video) {
+      return acc;
+    }
+
+    const { height } = video;
+
+    if (!height) {
+      return acc;
+    }
+
+    return height > acc ? height : acc;
   }, 0);
 }

@@ -1,17 +1,23 @@
-import { RedditResponse, RedditVideoPost } from "./types";
+import {
+  ProcessedRedditVideoPost,
+  RedditResponse,
+  RedditVideoPost,
+} from "./types";
 import { getAccessToken } from "./auth";
 import axios from "axios";
+import { downloadRedditPostVideo } from "./download-reddit-post-video";
 
 const { USER_AGENT } = process.env as { [key: string]: string };
 
 export async function fetchVideoPosts(
   subreddit: string,
   targetVideoCount: number,
-): Promise<RedditVideoPost[]> {
+  debug = false,
+): Promise<ProcessedRedditVideoPost[]> {
   const token = await getAccessToken();
-  const videoPosts: RedditVideoPost[] = [];
+  const videoPosts: ProcessedRedditVideoPost[] = [];
   let after: string | null = null;
-  const limit = 5; // Nombre maximum de posts par requête
+  const limit = 50; // Nombre maximum de posts par requête
   const rateLimitPerMinute = 100; // Limite de requêtes par minute
   const requestInterval = 60000 / rateLimitPerMinute; // Intervalle entre les requêtes en ms
 
@@ -38,7 +44,7 @@ export async function fetchVideoPosts(
       for (const post of posts) {
         const video = post.data.media?.reddit_video;
         if (post.data.is_video && video?.fallback_url) {
-          videoPosts.push({
+          const processedPost = await downloadRedditPostVideo({
             index,
             id: post.data.id,
             title: post.data.title,
@@ -51,6 +57,16 @@ export async function fetchVideoPosts(
             provider: "reddit",
             subreddit,
           });
+
+          if (processedPost) {
+            videoPosts.push(processedPost);
+          } else {
+            console.log(
+              `Erreur lors du traitement du post "${post.data.title}"`,
+            );
+
+            continue;
+          }
 
           index++;
 
@@ -69,7 +85,7 @@ export async function fetchVideoPosts(
             continue;
           }
 
-          videoPosts.push({
+          const processedPost = await downloadRedditPostVideo({
             index,
             id: post.data.id,
             title: post.data.title,
@@ -81,7 +97,20 @@ export async function fetchVideoPosts(
             subreddit,
           });
 
+          if (processedPost) {
+            videoPosts.push(processedPost);
+          } else {
+            console.log(
+              `Erreur lors du traitement du post "${post.data.title}"`,
+            );
+            continue;
+          }
+
           index++;
+
+          if (videoPosts.length >= targetVideoCount) {
+            break;
+          }
         }
       }
 

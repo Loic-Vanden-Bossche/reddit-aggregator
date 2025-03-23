@@ -9,29 +9,38 @@ import { exit } from "process";
 import { concatenateWithTransitions } from "./lib/concatenate";
 import { normalizeVideos } from "./lib/normalize";
 import { fetchVideoPosts } from "./lib/fetch-post";
-import { processRedditPosts } from "./lib/process-posts";
 
 program
   .requiredOption(
     "-s, --subreddit <subreddit>",
     "Subreddit to fetch posts from",
   )
-  .option("-c, --count <number>", "Number of posts to process", "10");
+  .option("-c, --count <number>", "Number of posts to process", "10")
+  // debug option
+  .option("-d, --debug", "output extra debugging", false);
 
 program.parse(process.argv);
 
 const options = program.opts();
 const subreddit: string = options.subreddit;
 const targetVideoCount: number = parseInt(options.count, 10);
+const isDebug: boolean = options.debug;
 
 (async () => {
-  const videos = await fetchVideoPosts(subreddit, targetVideoCount);
-  const processedPosts = await processRedditPosts(videos);
-  const processedPostsWithMetadata = await normalizeVideos(processedPosts);
+  const processedPosts = await fetchVideoPosts(
+    subreddit,
+    targetVideoCount,
+    isDebug,
+  );
+  const processedPostsWithMetadata = await normalizeVideos(
+    processedPosts,
+    isDebug,
+  );
 
   await concatenateWithTransitions(
     processedPostsWithMetadata,
     path.join("output", `${subreddit}_compilation.mp4`),
+    isDebug,
   );
 
   exit(0);

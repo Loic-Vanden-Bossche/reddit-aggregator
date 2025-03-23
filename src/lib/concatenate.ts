@@ -5,6 +5,7 @@ import ffmpeg from "fluent-ffmpeg";
 export async function concatenateWithTransitions(
   posts: ProcessedRedditVideoPostWithMetadata[],
   outputFilePath: string,
+  debug = false,
   transitionDuration = 1,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -23,9 +24,11 @@ export async function concatenateWithTransitions(
     command
       .complexFilter(filterChain, [finalVideoLabel, finalAudioLabel])
       .outputOptions("-movflags", "+faststart")
-      .on("start", () => console.log("Starting ffmpeg with transitions..."))
+      .on("start", () => console.log("\nStarting ffmpeg with transitions..."))
       .on("stderr", (line) => {
-        console.log(line);
+        if (debug) {
+          console.log(line);
+        }
       })
       .on("progress", (progress) => {
         if (progress.percent) {

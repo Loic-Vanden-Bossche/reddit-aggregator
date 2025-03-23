@@ -1,15 +1,41 @@
 import { FfprobeData } from "fluent-ffmpeg";
 
+export enum SortingOrder {
+  Top = "top",
+  Hot = "hot",
+  New = "new",
+  Rising = "rising",
+  Best = "best",
+  Controversial = "controversial",
+}
+
+export enum TimeRange {
+  Hour = "hour",
+  Day = "day",
+  Week = "week",
+  Month = "month",
+  Year = "year",
+  All = "all",
+}
+
+export interface RedditFetchOptions {
+  subredditOrUser: string;
+  isUserMode: boolean;
+  targetVideoCount: number;
+  sortingOrder: SortingOrder;
+  timeRange: TimeRange;
+}
+
 export interface RedditVideoPost {
   index: number;
   id: string;
   title: string;
   author: string;
-  audioUrl: string | null;
   videoUrl: string;
+  isHlsUrl: boolean;
   postUrl: string;
   provider: string;
-  subreddit: string;
+  subredditOrUser: string;
 }
 
 export interface ProcessedRedditVideoPost extends RedditVideoPost {
@@ -31,8 +57,7 @@ export interface RedditResponse {
           title: string;
           media: {
             reddit_video: {
-              fallback_url: string;
-              has_audio: boolean;
+              hls_url: string;
             };
             type: string;
             oembed: {

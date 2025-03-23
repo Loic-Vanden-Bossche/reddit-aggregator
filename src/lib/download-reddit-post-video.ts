@@ -1,55 +1,49 @@
-import { ProcessedRedditVideoPost, RedditVideoPost } from "./types";
+import { RedditVideoPost } from "./types";
 import path from "path";
 import { createDirectoryIfNotExists, downloadFile } from "./utils";
 import ffmpeg from "fluent-ffmpeg";
-import fs from "fs";
 
-export async function downloadRedditPostVideo(post: RedditVideoPost) {
+export async function downloadRedditPostVideo(
+  post: RedditVideoPost,
+  debug = false,
+) {
   try {
     // Création du dossier du subreddit
-    const subredditDir = path.join("output", post.subreddit);
+    const subredditDir = path.join("output", post.subredditOrUser);
     createDirectoryIfNotExists(subredditDir);
 
     // Nom du fichier basé sur le titre
     const sanitizedTitle = `${post.index}_${post.title.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
     const videoOutputPath = path.join(subredditDir, `${sanitizedTitle}.mp4`);
 
-    // Téléchargement du fichier vidéo
-    const videoTempPath = path.join(
-      subredditDir,
-      `${sanitizedTitle}_video.mp4`,
-    );
-
-    await downloadFile(post.videoUrl, videoTempPath);
-
-    if (post.audioUrl) {
-      // Téléchargement du fichier audio
-      const audioTempPath = path.join(
-        subredditDir,
-        `${sanitizedTitle}_audio.mp4`,
-      );
-      await downloadFile(post.audioUrl, audioTempPath);
-
-      // Fusion vidéo et audio avec ffmpeg
-      await new Promise((resolve, reject) => {
-        ffmpeg()
-          .input(videoTempPath)
-          .input(audioTempPath)
-          .outputOptions("-c:v copy", "-c:a aac", "-strict experimental")
-          .on("progress", (progress) => {
-            console.log(`Processing: ${progress.percent}% done`);
+    if (post.isHlsUrl) {
+      await new Promise<void>((resolve, reject) => {
+        ffmpeg(post.videoUrl)
+          .outputOptions("-c", "copy", "-bsf:a", "aac_adtstoasc")
+          .on("start", () =>
+            console.log("Downloading HLS video with ffmpeg..."),
+          )
+          .on("stderr", (line) => {
+            if (debug) {
+              console.log(line);
+            }
           })
-          .on("end", resolve)
-          .on("error", reject)
+          .on("progress", (progress) => {
+            if (progress.percent) {
+              console.log(`Progress: ${Math.round(progress.percent)}%`);
+            }
+          })
+          .on("end", () => {
+            resolve();
+          })
+          .on("error", (err) => {
+            console.error("Error during HLS download:", err.message);
+            reject(err);
+          })
           .save(videoOutputPath);
       });
-
-      // Suppression des fichiers temporaires
-      fs.unlinkSync(videoTempPath);
-      fs.unlinkSync(audioTempPath);
     } else {
-      // Si pas d'audio, renommer simplement le fichier vidéo
-      fs.renameSync(videoTempPath, videoOutputPath);
+      await downloadFile(post.videoUrl, videoOutputPath);
     }
 
     return {

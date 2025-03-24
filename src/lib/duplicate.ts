@@ -1,26 +1,49 @@
+import { spawn } from "child_process";
+import pLimit from "p-limit";
+import phash from "sharp-phash";
+import { createHash } from "crypto";
 import ffmpeg from "fluent-ffmpeg";
-import { imageHash } from "image-hash";
-import * as fs from "fs";
-import * as path from "path";
-import { promisify } from "util";
-import { tmpdir } from "os";
+import { PassThrough } from "stream";
 
-const imageHashAsync = promisify(imageHash);
+// Optional: cache to speed up repeated checks
+const hashCache = new Map<string, string>();
+const concurrencyLimit = 4;
+const limit = pLimit(concurrencyLimit);
 
-function extractFrame(videoPath: string, outputPath: string): Promise<void> {
+async function extractFrameBuffer(videoPath: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    const bufferChunks: Buffer[] = [];
+    const passThrough = new PassThrough();
+
     ffmpeg(videoPath)
-      .on("end", () => resolve())
+      .frames(1)
+      .setStartTime("00:00:01.000")
+      .videoFilters("scale=320:240")
+      .format("image2")
+      .outputOptions("-vcodec mjpeg")
       .on("error", reject)
-      .screenshots({
-        timestamps: ["10%"],
-        filename: path.basename(outputPath),
-        folder: path.dirname(outputPath),
-        size: "320x240",
-      });
+      .on("end", () => {
+        resolve(Buffer.concat(bufferChunks));
+      })
+      .pipe(passThrough, { end: true });
+
+    passThrough.on("data", (chunk) => bufferChunks.push(chunk));
+    passThrough.on("error", reject);
   });
 }
 
+// Generate a perceptual hash using sharp-phash
+async function getVideoHash(videoPath: string): Promise<string> {
+  if (hashCache.has(videoPath)) return hashCache.get(videoPath)!;
+
+  const frameBuffer = await extractFrameBuffer(videoPath);
+  const hash = await phash(frameBuffer);
+
+  hashCache.set(videoPath, hash);
+  return hash;
+}
+
+// Calculate Hamming distance between two hashes
 function hammingDistance(hash1: string, hash2: string): number {
   let dist = 0;
   for (let i = 0; i < hash1.length; i++) {
@@ -29,32 +52,25 @@ function hammingDistance(hash1: string, hash2: string): number {
   return dist;
 }
 
-async function getVideoHash(videoPath: string): Promise<string> {
-  const tmpImagePath = path.join(tmpdir(), `${path.basename(videoPath)}.jpg`);
-  await extractFrame(videoPath, tmpImagePath);
-  const hash = (await imageHashAsync(tmpImagePath, 16, "hex")) as string;
-  fs.unlinkSync(tmpImagePath); // cleanup
-  return hash;
-}
-
+// Compare a target video to others
 export async function isDuplicateVideo(
   targetVideoPath: string,
   otherVideoPaths: string[],
-  threshold: number = 10, // Hamming distance threshold
+  threshold: number = 10,
 ): Promise<boolean> {
-  if (otherVideoPaths.length === 0) {
-    return false;
-  }
+  if (otherVideoPaths.length === 0) return false;
 
   const targetHash = await getVideoHash(targetVideoPath);
 
-  for (const otherPath of otherVideoPaths) {
-    const otherHash = await getVideoHash(otherPath);
-    const distance = hammingDistance(targetHash, otherHash);
-    if (distance <= threshold) {
-      return true;
-    }
-  }
+  const results = await Promise.all(
+    otherVideoPaths.map((path) =>
+      limit(async () => {
+        const otherHash = await getVideoHash(path);
+        const distance = hammingDistance(targetHash, otherHash);
+        return distance <= threshold;
+      }),
+    ),
+  );
 
-  return false;
+  return results.includes(true);
 }

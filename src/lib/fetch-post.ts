@@ -102,7 +102,6 @@ export async function fetchVideoPosts(
 
       for (const post of posts) {
         if (post.data.pinned) {
-          console.log("Post épinglé, ignoré.");
           continue;
         }
 
@@ -132,9 +131,6 @@ export async function fetchVideoPosts(
           );
 
           if (!url) {
-            console.log(
-              `Impossible de récupérer l'URL de la vidéo pour le post "${post.data.title}"`,
-            );
             continue;
           }
 

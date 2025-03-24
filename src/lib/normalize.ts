@@ -71,31 +71,38 @@ export async function normalizeVideos(
       multibar.create(100, 0, { filename: p.title }),
     );
 
+    const dimensionsString = `${width}x${height}`;
+
+    const cacheDir = path.join("cache", "normalized", dimensionsString);
+
+    createDirectoryIfNotExists(cacheDir);
+
     const result = await Promise.all(
       chunk.map(async (post, postIndex) => {
         const inputPath = post.outputPath;
-        const subredditDir = path.join(
-          "output",
-          toSnakeCase(post.subredditOrUser),
-        );
-        createDirectoryIfNotExists(subredditDir);
 
-        const outputPath = path.join(subredditDir, `${post.id}_normalized.mp4`);
-
-        const textImageOutputPath = path.join(
-          subredditDir,
-          `${post.id}_text.png`,
+        const outputPath = path.join(
+          cacheDir,
+          `${post.id}_${dimensionsString}.mp4`,
         );
+
+        const bar = chunkProgress[postIndex];
+
+        if (fs.existsSync(outputPath)) {
+          bar.update(100, {
+            filename: post.title,
+          });
+          return {
+            ...post,
+            outputPath,
+          };
+        }
+
+        const textImageOutputPath = path.join(cacheDir, `${post.id}_text.png`);
 
         const hasAudio = await hasAudioStream(post);
 
         createTextImage(truncateTitle(post.title), textImageOutputPath);
-
-        const dimensions = findVideoDimensions(post);
-
-        if (!dimensions) {
-          return null;
-        }
 
         const normalizedPost =
           await new Promise<ProcessedRedditVideoPostWithMetadata | null>(
@@ -196,7 +203,6 @@ export async function normalizeVideos(
                   }
                 })
                 .on("end", () => {
-                  const bar = chunkProgress[postIndex];
                   bar.update(100, {
                     filename: post.title,
                   });
@@ -209,7 +215,6 @@ export async function normalizeVideos(
                 })
                 .on("progress", (progress) => {
                   if (progress.percent) {
-                    const bar = chunkProgress[postIndex];
                     bar.update(Math.round(progress.percent), {
                       filename: post.title,
                     });
@@ -220,7 +225,7 @@ export async function normalizeVideos(
                     `Error normalizing "${post.title}":`,
                     err.message,
                   );
-                  const bar = chunkProgress[postIndex];
+
                   bar.update(100, {
                     filename: post.title,
                   });

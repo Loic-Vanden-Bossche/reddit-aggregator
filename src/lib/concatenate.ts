@@ -56,11 +56,6 @@ export async function concatenateWithTransitions(
       })
       .save(outputFilePath);
   });
-
-  // cleanup
-  posts.forEach((post) => {
-    fs.unlinkSync(post.outputPath);
-  });
 }
 
 export function buildXfadeFilterChain(

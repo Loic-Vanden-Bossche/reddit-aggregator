@@ -1,5 +1,4 @@
 import * as dotenv from "dotenv";
-import * as path from "path";
 import { program } from "commander";
 
 dotenv.config();
@@ -9,6 +8,7 @@ import { concatenateWithTransitions } from "./lib/concatenate";
 import { normalizeVideos } from "./lib/normalize";
 import { fetchVideoPosts } from "./lib/fetch-post";
 import { RedditFetchOptions, SortingOrder, TimeRange } from "./lib/types";
+import { getFilePathFromFetchOptions } from "./lib/utils";
 
 program
   .option("-s, --subreddit <subreddit>", "Subreddit to fetch posts from")
@@ -133,7 +133,7 @@ const fetchOptions: RedditFetchOptions = {
 
   await concatenateWithTransitions(
     processedPostsWithMetadata,
-    path.join("output", `${subRedditOrUser}_compilation.mp4`),
+    getFilePathFromFetchOptions(fetchOptions),
     isDebug,
   );
 

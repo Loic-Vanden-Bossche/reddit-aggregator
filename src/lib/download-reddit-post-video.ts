@@ -11,7 +11,7 @@ export async function downloadRedditPostVideo(
   debug = false,
 ) {
   // Création du dossier du subreddit
-  const subredditDir = path.join("output", post.subredditOrUser, "cache");
+  const subredditDir = path.join("cache");
   createDirectoryIfNotExists(subredditDir);
 
   const videoOutputPath = path.join(subredditDir, `${post.id}.mp4`);

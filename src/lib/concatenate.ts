@@ -1,6 +1,7 @@
 import { ProcessedRedditVideoPostWithMetadata } from "./types";
 import { getVideoDuration } from "./video-metadata";
 import ffmpeg from "fluent-ffmpeg";
+import fs from "fs";
 
 export async function concatenateWithTransitions(
   posts: ProcessedRedditVideoPostWithMetadata[],
@@ -8,12 +9,12 @@ export async function concatenateWithTransitions(
   debug = false,
   transitionDuration = 1,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const durations = posts.map((post) => getVideoDuration(post));
+  const durations = posts.map((post) => getVideoDuration(post));
 
-    const { filterChain, finalVideoLabel, finalAudioLabel } =
-      buildXfadeFilterChain(posts.length, durations, transitionDuration);
+  const { filterChain, finalVideoLabel, finalAudioLabel } =
+    buildXfadeFilterChain(posts.length, durations, transitionDuration);
 
+  await new Promise<void>((resolve, reject) => {
     // Build command
     const command = ffmpeg();
 
@@ -44,6 +45,11 @@ export async function concatenateWithTransitions(
         reject(err);
       })
       .save(outputFilePath);
+  });
+
+  // cleanup
+  posts.forEach((post) => {
+    fs.unlinkSync(post.outputPath);
   });
 }
 

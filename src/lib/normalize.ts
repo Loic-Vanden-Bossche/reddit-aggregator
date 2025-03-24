@@ -86,12 +86,16 @@ export async function normalizeVideos(
       chunk.map(async (post, postIndex) => {
         const inputPath = post.outputPath;
         const subredditDir = path.join("output", post.subredditOrUser);
+        createDirectoryIfNotExists(subredditDir);
 
         const outputPath = path.join(subredditDir, `${post.id}_normalized.mp4`);
 
-        const hasAudio = await hasAudioStream(post);
+        const textImageOutputPath = path.join(
+          subredditDir,
+          `${post.id}_text.png`,
+        );
 
-        const textImageOutputPath = inputPath.replace(/\.mp4$/, "_text.png");
+        const hasAudio = await hasAudioStream(post);
 
         createTextImage(truncateTitle(post.title), textImageOutputPath);
 

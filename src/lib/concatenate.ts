@@ -3,10 +3,13 @@ import { getVideoDuration } from "./video-metadata";
 import ffmpeg from "fluent-ffmpeg";
 import fs from "fs";
 import ora from "ora";
+import { createDirectoryIfNotExists } from "./utils";
+import path from "path";
 
 export async function concatenateWithTransitions(
   posts: ProcessedRedditVideoPostWithMetadata[],
-  outputFilePath: string,
+  outputDirectory: string,
+  outputFileName: string,
   debug = false,
   transitionDuration = 1,
 ): Promise<void> {
@@ -16,6 +19,10 @@ export async function concatenateWithTransitions(
     buildXfadeFilterChain(posts.length, durations, transitionDuration);
 
   console.log("\nConcatenating videos with transitions...");
+
+  createDirectoryIfNotExists(outputDirectory);
+
+  const outputFilePath = path.join(outputDirectory, outputFileName);
 
   const spinner = ora({
     text: "Starting ffmpeg with transitions...",

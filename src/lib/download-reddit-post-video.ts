@@ -2,12 +2,10 @@ import { RedditVideoPost } from "./types";
 import path from "path";
 import { createDirectoryIfNotExists, downloadFile } from "./utils";
 import ffmpeg from "fluent-ffmpeg";
-import { isDuplicateVideo } from "./duplicate";
 import fs from "fs";
 
 export async function downloadRedditPostVideo(
   post: RedditVideoPost,
-  otherVideoPaths: string[],
   debug = false,
 ) {
   // Création du dossier du subreddit
@@ -68,20 +66,6 @@ export async function downloadRedditPostVideo(
       } else {
         await downloadFile(post.videoUrl, videoOutputPath);
       }
-    }
-
-    const isDuplicate = await isDuplicateVideo(
-      videoOutputPath,
-      otherVideoPaths,
-      10,
-    );
-
-    if (isDuplicate) {
-      console.log(`\nDuplicate video detected: ${post.title}`);
-
-      // Suppression du fichier dupliqué
-      fs.unlinkSync(videoOutputPath);
-      return null;
     }
 
     return {

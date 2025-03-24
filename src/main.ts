@@ -131,9 +131,11 @@ const fetchOptions: RedditFetchOptions = {
     isDebug,
   );
 
+  const { dir, name } = getFilePathFromFetchOptions(fetchOptions);
   await concatenateWithTransitions(
     processedPostsWithMetadata,
-    getFilePathFromFetchOptions(fetchOptions),
+    dir,
+    name,
     isDebug,
   );
 

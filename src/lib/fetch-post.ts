@@ -1,5 +1,5 @@
 import {
-  ProcessedRedditVideoPost,
+  ProcessedRedditVideoPostWithMetadata,
   RedditFetchOptions,
   RedditResponse,
   RedditVideoPost,
@@ -10,6 +10,8 @@ import { downloadRedditPostVideo } from "./download-reddit-post-video";
 
 import cliProgress from "cli-progress";
 import chalk from "chalk";
+import { attachFfmpegMetadata } from "./video-metadata";
+import { checkVideoCompliance } from "./video-compliance";
 
 const { USER_AGENT } = process.env as { [key: string]: string };
 
@@ -38,9 +40,9 @@ function constructRedditUrl(fetchOptions: RedditFetchOptions) {
 export async function fetchVideoPosts(
   fetchOptions: RedditFetchOptions,
   debug = false,
-): Promise<ProcessedRedditVideoPost[]> {
+): Promise<ProcessedRedditVideoPostWithMetadata[]> {
   const token = await getAccessToken();
-  const videoPosts: ProcessedRedditVideoPost[] = [];
+  const videoPosts: ProcessedRedditVideoPostWithMetadata[] = [];
   let after: string | null = null;
   const limit = 50; // Nombre maximum de posts par requête
   const rateLimitPerMinute = 100; // Limite de requêtes par minute
@@ -109,6 +111,8 @@ export async function fetchVideoPosts(
 
         let foundPost: RedditVideoPost | null = null;
 
+        progressBar.update(index + 1, { title: post.data.title });
+
         if (post.data.is_video && video?.hls_url) {
           foundPost = {
             index,
@@ -162,15 +166,37 @@ export async function fetchVideoPosts(
         }
 
         if (foundPost) {
-          const processedPost = await downloadRedditPostVideo(
-            foundPost,
-            videoPosts.map((post) => post.outputPath),
-            debug,
-          );
+          const processedPost = await downloadRedditPostVideo(foundPost, debug);
 
           if (processedPost) {
-            progressBar.update(index + 1, { title: processedPost.title });
-            videoPosts.push(processedPost);
+            const postWithMetadata = await attachFfmpegMetadata(processedPost);
+
+            const notCompliantReason = await checkVideoCompliance(
+              postWithMetadata,
+              videoPosts.map((post) => post.outputPath),
+            );
+
+            function logMessage(message: string) {
+              // Stop the progress bar temporarily
+              progressBar.stop();
+
+              // Log the message
+              console.log(message);
+
+              // Resume the progress bar
+              progressBar.start(progressBar.getTotal(), index + 1, {
+                title: postWithMetadata.title,
+              });
+            }
+
+            if (notCompliantReason) {
+              logMessage(
+                `Non compliant video detected: ${postWithMetadata.title} - ${notCompliantReason}`,
+              );
+
+              continue;
+            }
+            videoPosts.push(postWithMetadata);
           } else {
             continue;
           }

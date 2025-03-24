@@ -47,24 +47,27 @@ export function toSnakeCase(input: string): string {
     .trim();
 }
 
-function getAvailableFilePath(filePath: string): string {
+function getAvailableFilePath(filePath: string) {
+  const dir = path.dirname(filePath);
+
   if (!fs.existsSync(filePath)) {
-    return filePath;
+    return { dir, name: path.basename(filePath) };
   }
 
-  const dir = path.dirname(filePath);
   const ext = path.extname(filePath);
   const baseName = path.basename(filePath, ext);
 
   let counter = 1;
-  let newPath = path.join(dir, `${baseName}_${counter}${ext}`);
+  let newName = `${baseName}_${counter}${ext}`;
+  let newPath = path.join(dir, newName);
 
   while (fs.existsSync(newPath)) {
     counter++;
-    newPath = path.join(dir, `${baseName}_${counter}${ext}`);
+    newName = `${baseName}_${counter}${ext}`;
+    newPath = path.join(dir, newName);
   }
 
-  return newPath;
+  return { dir, name: newName };
 }
 
 function sanitizeFileName(input: string): string {
@@ -79,9 +82,7 @@ function sanitizeFileName(input: string): string {
   );
 }
 
-export function getFilePathFromFetchOptions(
-  options: RedditFetchOptions,
-): string {
+export function getFilePathFromFetchOptions(options: RedditFetchOptions) {
   const base = toSnakeCase(options.subredditOrUser ?? "search");
   const sorting = options.sortingOrder;
   const time = options.timeRange ? `_${options.timeRange}` : "";

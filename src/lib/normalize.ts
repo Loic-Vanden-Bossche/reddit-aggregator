@@ -1,17 +1,9 @@
-import {
-  ProcessedRedditVideoPost,
-  ProcessedRedditVideoPostWithMetadata,
-} from "./types";
+import { ProcessedRedditVideoPostWithMetadata } from "./types";
 import ffmpeg from "fluent-ffmpeg";
-import {
-  attachFfmpegMetadata,
-  findFinalResolution,
-  findVideoDimensions,
-  hasAudioStream,
-} from "./video-metadata";
+import { findFinalResolution, hasAudioStream } from "./video-metadata";
 import { createTextImage } from "./text-to-image";
 import fs from "fs";
-import { chunkArray, createDirectoryIfNotExists, toSnakeCase } from "./utils";
+import { chunkArray, createDirectoryIfNotExists } from "./utils";
 import path from "path";
 import cliProgress from "cli-progress";
 import chalk from "chalk";
@@ -24,7 +16,7 @@ function truncateTitle(title: string, wordCount = 15) {
 }
 
 export async function normalizeVideos(
-  posts: ProcessedRedditVideoPost[],
+  posts: ProcessedRedditVideoPostWithMetadata[],
   debug = false,
 ): Promise<ProcessedRedditVideoPostWithMetadata[]> {
   const bypass = (command: ffmpeg.FfmpegCommand) => {
@@ -41,17 +33,13 @@ export async function normalizeVideos(
     };
   };
 
-  const postsWithMetadata = await Promise.all(
-    posts.map((post) => attachFfmpegMetadata(post)),
-  );
+  const { width, height } = await findFinalResolution(posts);
 
-  const { width, height } = await findFinalResolution(postsWithMetadata);
-
-  const chunks = chunkArray(postsWithMetadata, 10);
+  const chunks = chunkArray(posts, 10);
 
   const normalizedPosts: ProcessedRedditVideoPostWithMetadata[] = [];
 
-  console.log(`\nNormalizing ${postsWithMetadata.length} videos...`);
+  console.log(`\nNormalizing ${posts.length} videos...`);
 
   for (const chunk of chunks) {
     const multibar = new cliProgress.MultiBar(

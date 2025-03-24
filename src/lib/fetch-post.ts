@@ -3,6 +3,7 @@ import {
   RedditFetchOptions,
   RedditResponse,
   RedditVideoPost,
+  VideoComplianceOptions,
 } from "./types";
 import { getAccessToken } from "./auth";
 import axios from "axios";
@@ -37,9 +38,65 @@ function constructRedditUrl(fetchOptions: RedditFetchOptions) {
   };
 }
 
+const complianceOptionsToString = (options: VideoComplianceOptions): string => {
+  const {
+    verticalOrientation,
+    horizontalOrientation,
+    minDuration,
+    maxDuration,
+    minResolution,
+    skipDuplicates,
+    skipNoAudio,
+  } = options;
+
+  const optionsArray = [];
+
+  if (verticalOrientation) {
+    optionsArray.push("vertical orientation");
+  }
+
+  if (horizontalOrientation) {
+    optionsArray.push("horizontal orientation");
+  }
+
+  if (minDuration) {
+    optionsArray.push(`min duration: ${minDuration}s`);
+  }
+
+  if (maxDuration) {
+    optionsArray.push(`max duration: ${maxDuration}s`);
+  }
+
+  if (minResolution) {
+    optionsArray.push(`min resolution: ${minResolution}px`);
+  }
+
+  if (skipDuplicates) {
+    optionsArray.push("skip duplicates");
+  }
+
+  if (skipNoAudio) {
+    optionsArray.push("skip no audio");
+  }
+
+  return optionsArray.join(", ");
+};
+
+function getRateWithPadding(value: number, total: number): string {
+  return Math.round((value / total) * 100)
+    .toString()
+    .padStart(3, " ");
+}
+
+function getIndexWithPadding(value: number, total: number): string {
+  return value.toString().padStart(total.toString().length, " ");
+}
+
 export async function fetchVideoPosts(
   fetchOptions: RedditFetchOptions,
+  videoComplianceOptions: VideoComplianceOptions,
   debug = false,
+  verbose = false,
 ): Promise<ProcessedRedditVideoPostWithMetadata[]> {
   const token = await getAccessToken();
   const videoPosts: ProcessedRedditVideoPostWithMetadata[] = [];
@@ -68,13 +125,16 @@ export async function fetchVideoPosts(
   console.log(
     `Récupération des posts vidéo${sbOrUser} avec o=${sortingOrder}${timeRangeLog}${queryLog}...`,
   );
+  console.log(
+    `Options de conformité vidéo: ${complianceOptionsToString(videoComplianceOptions)}`,
+  );
 
   const progressBar = new cliProgress.SingleBar(
     {
       format:
         "Downloading videos |" +
         chalk.cyan("{bar}") +
-        "| {percentage}% || {value}/{total} Videos - {title}",
+        `| {rate}% || {valueWithPadding}/{total} Videos - {globalIndex} ({currentPage}) - {title}`,
       barCompleteChar: "\u2588",
       barIncompleteChar: "\u2591",
       hideCursor: true,
@@ -82,9 +142,18 @@ export async function fetchVideoPosts(
     cliProgress.Presets.shades_classic,
   );
 
-  progressBar.start(targetVideoCount, 0, { title: "Starting..." });
+  progressBar.start(targetVideoCount, 0, {
+    title: "Starting...",
+    rate: "  0",
+    valueWithPadding: getIndexWithPadding(0, targetVideoCount),
+    globalIndex: 0,
+    currentPage: 1,
+  });
 
   const { url, params } = constructRedditUrl(fetchOptions);
+
+  let currentPage = 1;
+  let globalIndex = 1;
 
   try {
     while (videoPosts.length < targetVideoCount) {
@@ -103,22 +172,46 @@ export async function fetchVideoPosts(
       const posts = response.data.data.children;
 
       for (const post of posts) {
-        if (post.data.pinned) {
-          continue;
-        }
-
         const video = post.data.media?.reddit_video;
 
         let foundPost: RedditVideoPost | null = null;
 
-        progressBar.update(index + 1, { title: post.data.title });
+        const title = post.data.title;
+        const id = post.data.id;
+        const author = post.data.author;
+
+        const getProgress = () => {
+          return {
+            title,
+            rate: getRateWithPadding(index + 1, targetVideoCount),
+            valueWithPadding: getIndexWithPadding(index + 1, targetVideoCount),
+            currentPage,
+            globalIndex,
+          };
+        };
+
+        if (title) {
+          progressBar.update(index + 1, getProgress());
+
+          globalIndex++;
+        }
+
+        if (post.data.pinned) {
+          if (verbose) {
+            console.log(
+              `Post épinglé détecté: ${post.data.title} - ${post.data.permalink}`,
+            );
+          }
+
+          continue;
+        }
 
         if (post.data.is_video && video?.hls_url) {
           foundPost = {
             index,
-            id: post.data.id,
-            title: post.data.title,
-            author: post.data.author,
+            id,
+            title,
+            author,
             videoUrl: video.hls_url,
             isHlsUrl: true,
             isGif: false,
@@ -140,9 +233,9 @@ export async function fetchVideoPosts(
 
           foundPost = {
             index,
-            id: post.data.id,
-            title: post.data.title,
-            author: post.data.author,
+            id,
+            title,
+            author,
             videoUrl: url,
             isHlsUrl: false,
             isGif: false,
@@ -153,9 +246,9 @@ export async function fetchVideoPosts(
         } else if (post.data.url?.endsWith(".gif")) {
           foundPost = {
             index,
-            id: post.data.id,
-            title: post.data.title,
-            author: post.data.author,
+            id,
+            title,
+            author,
             videoUrl: post.data.url,
             isHlsUrl: false,
             isGif: true,
@@ -166,13 +259,18 @@ export async function fetchVideoPosts(
         }
 
         if (foundPost) {
-          const processedPost = await downloadRedditPostVideo(foundPost, debug);
+          const processedPost = await downloadRedditPostVideo(
+            foundPost,
+            debug,
+            verbose,
+          );
 
           if (processedPost) {
             const postWithMetadata = await attachFfmpegMetadata(processedPost);
 
             const notCompliantReason = await checkVideoCompliance(
               postWithMetadata,
+              videoComplianceOptions,
               videoPosts.map((post) => post.outputPath),
             );
 
@@ -184,15 +282,15 @@ export async function fetchVideoPosts(
               console.log(message);
 
               // Resume the progress bar
-              progressBar.start(progressBar.getTotal(), index + 1, {
-                title: postWithMetadata.title,
-              });
+              progressBar.start(targetVideoCount, index + 1, getProgress());
             }
 
-            if (notCompliantReason) {
-              logMessage(
-                `Non compliant video detected: ${postWithMetadata.title} - ${notCompliantReason}`,
-              );
+            if (notCompliantReason.length) {
+              if (verbose) {
+                logMessage(
+                  `Non compliant video detected: ${postWithMetadata.postUrl} - ${notCompliantReason.join(", ")}`,
+                );
+              }
 
               continue;
             }
@@ -218,6 +316,8 @@ export async function fetchVideoPosts(
 
       // Attendre avant la prochaine requête pour respecter la limite de taux
       await new Promise((resolve) => setTimeout(resolve, requestInterval));
+
+      currentPage++;
     }
   } catch (error: Error | any) {
     console.error(

@@ -4,9 +4,9 @@ import {
   ProcessedRedditVideoPostWithMetadata,
 } from "./types";
 
-export async function hasAudioStream(
+export function hasAudioStream(
   post: ProcessedRedditVideoPostWithMetadata,
-): Promise<boolean> {
+): boolean {
   return post.metadata.streams.some(
     (stream: any) => stream.codec_type === "audio",
   );

@@ -7,6 +7,7 @@ import fs from "fs";
 export async function downloadRedditPostVideo(
   post: RedditVideoPost,
   debug = false,
+  verbose = false,
 ) {
   // Création du dossier du subreddit
   const subredditDir = path.join("cache");
@@ -72,11 +73,12 @@ export async function downloadRedditPostVideo(
       ...post,
       outputPath: videoOutputPath,
     };
-  } catch (err) {
-    console.error(
-      `\nErreur lors du traitement de la vidéo ${post.id}\n"${post.title}"\n${post.postUrl}\n${post.videoUrl}\n`,
-      err,
-    );
+  } catch (err: Error | any) {
+    if (verbose) {
+      console.error(
+        `\nErreur lors du traitement de la vidéo ${post.id}\n"${post.title}"\n${post.postUrl}\n${post.videoUrl}\n${err.message}\n`,
+      );
+    }
 
     // Suppression du fichier en cas d'erreur
     try {

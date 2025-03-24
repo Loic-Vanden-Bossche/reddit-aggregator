@@ -88,7 +88,7 @@ export async function normalizeVideos(
 
         const textImageOutputPath = path.join(cacheDir, `${post.id}_text.png`);
 
-        const hasAudio = await hasAudioStream(post);
+        const hasAudio = hasAudioStream(post);
 
         createTextImage(truncateTitle(post.title), textImageOutputPath);
 

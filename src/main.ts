@@ -7,7 +7,12 @@ import { exit } from "process";
 import { concatenateWithTransitions } from "./lib/concatenate";
 import { normalizeVideos } from "./lib/normalize";
 import { fetchVideoPosts } from "./lib/fetch-post";
-import { RedditFetchOptions, SortingOrder, TimeRange } from "./lib/types";
+import {
+  RedditFetchOptions,
+  SortingOrder,
+  TimeRange,
+  VideoComplianceOptions,
+} from "./lib/types";
 import { getFilePathFromFetchOptions } from "./lib/utils";
 
 program
@@ -17,6 +22,14 @@ program
   .option("-t, --time-range <range>", "Time range")
   .option("-c, --count <number>", "Number of posts to process", "10")
   .option("-q, --query <query>", "Query to search for")
+  .option("--skip-no-audio", "Skip videos without audio", false)
+  .option("--skip-duplicates", "Skip duplicate videos", true)
+  .option("--vertical", "Only vertical videos", false)
+  .option("--horizontal", "Only horizontal videos", false)
+  .option("--min-resolution <resolution>", "Minimum video resolution")
+  .option("--min-duration <duration>", "Minimum video duration")
+  .option("--max-duration <duration>", "Maximum video duration")
+  .option("-v, --verbose", "Output extra information", false)
   .option("-d, --debug", "Output extra debugging", false);
 
 program.parse(process.argv);
@@ -110,8 +123,39 @@ if (isUserMode && sortingOrder === SortingOrder.Rising) {
   process.exit(1);
 }
 
+if (options.vertical && options.horizontal) {
+  console.error("Error: You can only choose one orientation.");
+  process.exit(1);
+}
+
+// format: 1920x1080
+const parseVideoResolution = (resolution: string): number | undefined => {
+  const [width, height] = resolution.split("x").map((x) => parseInt(x, 10));
+  if (width && height) {
+    return width * height;
+  }
+  return undefined;
+};
+
+const videoComplianceOptions: VideoComplianceOptions = {
+  verticalOrientation: options.vertical,
+  horizontalOrientation: options.horizontal,
+  minResolution: options.minResolution
+    ? parseVideoResolution(options.minResolution)
+    : undefined,
+  minDuration: options.minDuration
+    ? parseInt(options.minDuration, 10)
+    : undefined,
+  maxDuration: options.maxDuration
+    ? parseInt(options.maxDuration, 10)
+    : undefined,
+  skipDuplicates: options.skipDuplicates,
+  skipNoAudio: options.skipNoAudio,
+};
+
 const targetVideoCount: number = parseInt(options.count, 10);
 const isDebug: boolean = options.debug;
+const isVerbose: boolean = options.verbose;
 
 const subRedditOrUser = subreddit ?? user;
 
@@ -125,7 +169,12 @@ const fetchOptions: RedditFetchOptions = {
 };
 
 (async () => {
-  const processedPosts = await fetchVideoPosts(fetchOptions, isDebug);
+  const processedPosts = await fetchVideoPosts(
+    fetchOptions,
+    videoComplianceOptions,
+    isDebug,
+    isVerbose,
+  );
   const processedPostsWithMetadata = await normalizeVideos(
     processedPosts,
     isDebug,

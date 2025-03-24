@@ -20,6 +20,16 @@ export enum TimeRange {
   All = "all",
 }
 
+export interface VideoComplianceOptions {
+  verticalOrientation: boolean;
+  horizontalOrientation: boolean;
+  minDuration?: number;
+  maxDuration?: number;
+  minResolution?: number;
+  skipDuplicates: boolean;
+  skipNoAudio: boolean;
+}
+
 export interface RedditFetchOptions {
   subredditOrUser?: string;
   isUserMode: boolean;

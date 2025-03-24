@@ -13,26 +13,8 @@ import { createTextImage } from "./text-to-image";
 import fs from "fs";
 import { chunkArray, createDirectoryIfNotExists } from "./utils";
 import path from "path";
-
-function displayProgress(progress: number) {
-  const barLength = 20;
-  const progressChars = Math.round(barLength * (progress / 100));
-  const bar = "█".repeat(progressChars).padEnd(barLength, "░");
-  process.stdout.write(`\r[${bar}] ${progress.toFixed(2)}%`);
-}
-
-function calculateTotalProgress(
-  upperProgress: number,
-  chunkScaleFactor: number,
-  progresses: number[],
-) {
-  const progressesAverage =
-    progresses.reduce((acc, progress) => {
-      return acc + progress;
-    }, 0) / progresses.length;
-
-  return upperProgress + progressesAverage * chunkScaleFactor;
-}
+import cliProgress from "cli-progress";
+import chalk from "chalk";
 
 function truncateTitle(title: string, wordCount = 15) {
   const words = title.split(" ");
@@ -69,18 +51,25 @@ export async function normalizeVideos(
 
   const normalizedPosts: ProcessedRedditVideoPostWithMetadata[] = [];
 
-  let totalProgress = 0;
-
   console.log(`Normalizing ${postsWithMetadata.length} videos...`);
 
   for (const chunk of chunks) {
-    // exemple: chunk.length = 10 && postsWithMetadata.length = 100, chunkScaleFactor = 0.1
-    const chunkScaleFactor = chunk.length / postsWithMetadata.length;
+    const multibar = new cliProgress.MultiBar(
+      {
+        format:
+          "Normalizing video |" +
+          chalk.cyan("{bar}") +
+          "| {value}% || {filename}",
+        barCompleteChar: "\u2588",
+        barIncompleteChar: "\u2591",
+        hideCursor: true,
+      },
+      cliProgress.Presets.shades_grey,
+    );
 
-    // create an array of the length of the number of elment in chunk and fill with 0
-    const chunkProgress = Array.from({
-      length: chunk.length,
-    }).fill(0) as Array<number>;
+    const chunkProgress = chunk.map((p) =>
+      multibar.create(100, 0, { filename: p.title }),
+    );
 
     const result = await Promise.all(
       chunk.map(async (post, postIndex) => {
@@ -207,7 +196,12 @@ export async function normalizeVideos(
                   }
                 })
                 .on("end", () => {
-                  chunkProgress[postIndex] = 100;
+                  const bar = chunkProgress[postIndex];
+                  bar.update(100, {
+                    filename: post.title,
+                  });
+                  bar.stop();
+
                   resolve({
                     ...post,
                     outputPath,
@@ -215,15 +209,10 @@ export async function normalizeVideos(
                 })
                 .on("progress", (progress) => {
                   if (progress.percent) {
-                    chunkProgress[postIndex] = progress.percent;
-
-                    const cProgress = calculateTotalProgress(
-                      totalProgress,
-                      chunkScaleFactor,
-                      chunkProgress,
-                    );
-
-                    displayProgress(cProgress);
+                    const bar = chunkProgress[postIndex];
+                    bar.update(Math.round(progress.percent), {
+                      filename: post.title,
+                    });
                   }
                 })
                 .on("error", (err) => {
@@ -231,7 +220,11 @@ export async function normalizeVideos(
                     `Error normalizing "${post.title}":`,
                     err.message,
                   );
-                  chunkProgress[postIndex] = 100;
+                  const bar = chunkProgress[postIndex];
+                  bar.update(100, {
+                    filename: post.title,
+                  });
+                  bar.stop();
                   resolve(null);
                 })
                 .save(outputPath);
@@ -251,11 +244,7 @@ export async function normalizeVideos(
         ) as ProcessedRedditVideoPostWithMetadata[],
     );
 
-    totalProgress += calculateTotalProgress(
-      totalProgress,
-      chunkScaleFactor,
-      chunkProgress,
-    );
+    multibar.stop();
 
     normalizedPosts.push(...result);
   }

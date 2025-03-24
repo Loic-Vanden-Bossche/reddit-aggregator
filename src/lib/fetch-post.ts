@@ -62,7 +62,7 @@ export async function fetchVideoPosts(
       format:
         "Downloading videos |" +
         chalk.cyan("{bar}") +
-        "| {percentage}% || {value}/{total} Videos",
+        "| {percentage}% || {value}/{total} Videos - {title}",
       barCompleteChar: "\u2588",
       barIncompleteChar: "\u2591",
       hideCursor: true,
@@ -70,7 +70,7 @@ export async function fetchVideoPosts(
     cliProgress.Presets.shades_classic,
   );
 
-  progressBar.start(targetVideoCount, 0);
+  progressBar.start(targetVideoCount, 0, { title: "Starting..." });
 
   try {
     while (videoPosts.length < targetVideoCount) {
@@ -175,11 +175,7 @@ export async function fetchVideoPosts(
           );
 
           if (processedPost) {
-            // console.log(
-            //   `${index + 1}/${targetVideoCount}:`,
-            //   processedPost.postUrl,
-            // );
-            progressBar.update(index + 1);
+            progressBar.update(index + 1, { title: processedPost.title });
             videoPosts.push(processedPost);
           } else {
             continue;

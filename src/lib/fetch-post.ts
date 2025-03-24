@@ -3,12 +3,13 @@ import {
   RedditFetchOptions,
   RedditResponse,
   RedditVideoPost,
-  SortingOrder,
-  TimeRange,
 } from "./types";
 import { getAccessToken } from "./auth";
 import axios from "axios";
 import { downloadRedditPostVideo } from "./download-reddit-post-video";
+
+import cliProgress from "cli-progress";
+import chalk from "chalk";
 
 const { USER_AGENT } = process.env as { [key: string]: string };
 
@@ -55,6 +56,21 @@ export async function fetchVideoPosts(
   } = fetchOptions;
 
   let index = 0;
+
+  const progressBar = new cliProgress.SingleBar(
+    {
+      format:
+        "Downloading videos |" +
+        chalk.cyan("{bar}") +
+        "| {percentage}% || {value}/{total} Videos",
+      barCompleteChar: "\u2588",
+      barIncompleteChar: "\u2591",
+      hideCursor: true,
+    },
+    cliProgress.Presets.shades_classic,
+  );
+
+  progressBar.start(targetVideoCount, 0);
 
   try {
     while (videoPosts.length < targetVideoCount) {
@@ -159,10 +175,11 @@ export async function fetchVideoPosts(
           );
 
           if (processedPost) {
-            console.log(
-              `${index + 1}/${targetVideoCount}:`,
-              processedPost.postUrl,
-            );
+            // console.log(
+            //   `${index + 1}/${targetVideoCount}:`,
+            //   processedPost.postUrl,
+            // );
+            progressBar.update(index + 1);
             videoPosts.push(processedPost);
           } else {
             continue;
@@ -192,6 +209,8 @@ export async function fetchVideoPosts(
       error?.message,
     );
   }
+
+  progressBar.stop();
 
   return videoPosts;
 }

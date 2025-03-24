@@ -11,7 +11,7 @@ import {
 } from "./video-metadata";
 import { createTextImage } from "./text-to-image";
 import fs from "fs";
-import { chunkArray, createDirectoryIfNotExists } from "./utils";
+import { chunkArray, createDirectoryIfNotExists, toSnakeCase } from "./utils";
 import path from "path";
 import cliProgress from "cli-progress";
 import chalk from "chalk";
@@ -74,7 +74,10 @@ export async function normalizeVideos(
     const result = await Promise.all(
       chunk.map(async (post, postIndex) => {
         const inputPath = post.outputPath;
-        const subredditDir = path.join("output", post.subredditOrUser);
+        const subredditDir = path.join(
+          "output",
+          toSnakeCase(post.subredditOrUser),
+        );
         createDirectoryIfNotExists(subredditDir);
 
         const outputPath = path.join(subredditDir, `${post.id}_normalized.mp4`);

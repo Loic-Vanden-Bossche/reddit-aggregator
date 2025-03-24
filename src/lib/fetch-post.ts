@@ -210,6 +210,10 @@ export async function fetchVideoPosts(
 }
 
 function extractVideoUrlFromRedgifs(url: string) {
+  if (!url) {
+    return null;
+  }
+
   const match = url.match(/\/([^/]+)-poster\.jpg$/);
   const result = match ? match[1] : null;
 

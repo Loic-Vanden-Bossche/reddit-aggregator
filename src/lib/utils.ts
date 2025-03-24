@@ -38,7 +38,7 @@ export function chunkArray<T>(array: T[], size: number): T[][] {
   );
 }
 
-function toSnakeCase(input: string): string {
+export function toSnakeCase(input: string): string {
   return input
     .replace(/([a-z0-9])([A-Z])/g, "$1_$2") // Handle camelCase → snake_case
     .replace(/[\s\-]+/g, "_") // Replace spaces and dashes with underscores
@@ -67,6 +67,18 @@ function getAvailableFilePath(filePath: string): string {
   return newPath;
 }
 
+function sanitizeFileName(input: string): string {
+  return (
+    input
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x1f<>:"/\\|?*\u007F]+/g, "") // Remove invalid characters
+      .replace(/\s+/g, "_") // Replace whitespace with underscores
+      .replace(/\.+$/, "") // Remove trailing dots
+      .replace(/^_+|_+$/g, "") // Trim leading/trailing underscores
+      .slice(0, 255) // Limit length (safe max for most FS)
+  );
+}
+
 export function getFilePathFromFetchOptions(
   options: RedditFetchOptions,
 ): string {
@@ -76,7 +88,9 @@ export function getFilePathFromFetchOptions(
   const query = options.query ? `_${toSnakeCase(options.query)}` : "";
   const count = `_[${options.targetVideoCount}]`;
 
-  const fileName = `${base}_${sorting}${time}${query}${count}.mp4`;
+  const fileName = sanitizeFileName(
+    `${base}_${sorting}${time}${query}${count}.mp4`,
+  );
   const filePath = path.join("output", base, fileName);
 
   return getAvailableFilePath(filePath);

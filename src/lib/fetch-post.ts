@@ -57,6 +57,16 @@ export async function fetchVideoPosts(
 
   let index = 0;
 
+  const timeRangeLog = timeRange ? ` et t=${timeRange}` : "";
+  const queryLog = query ? ` avec q=${query}` : "";
+  const sbOrUser = subredditOrUser
+    ? ` de ${isUserMode ? "u" : "r"}/${subredditOrUser}`
+    : "";
+
+  console.log(
+    `Récupération des posts vidéo${sbOrUser} avec o=${sortingOrder}${timeRangeLog}${queryLog}...`,
+  );
+
   const progressBar = new cliProgress.SingleBar(
     {
       format:
@@ -72,22 +82,10 @@ export async function fetchVideoPosts(
 
   progressBar.start(targetVideoCount, 0, { title: "Starting..." });
 
+  const { url, params } = constructRedditUrl(fetchOptions);
+
   try {
     while (videoPosts.length < targetVideoCount) {
-      const timeRangeLog = timeRange ? ` et t=${timeRange}` : "";
-
-      const queryLog = query ? ` avec q=${query}` : "";
-
-      const sbOrUser = subredditOrUser
-        ? ` de ${isUserMode ? "u" : "r"}/${subredditOrUser}`
-        : "";
-
-      console.log(
-        `Récupération des posts vidéo${sbOrUser} avec o=${sortingOrder}${timeRangeLog}${queryLog}...`,
-      );
-
-      const { url, params } = constructRedditUrl(fetchOptions);
-
       const response: RedditResponse = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -192,7 +190,7 @@ export async function fetchVideoPosts(
       after = response.data.data.after;
 
       if (!after) {
-        console.log("Plus de posts disponibles.");
+        console.log("\nPlus de posts disponibles.");
         break;
       }
 
@@ -201,7 +199,7 @@ export async function fetchVideoPosts(
     }
   } catch (error: Error | any) {
     console.error(
-      "Erreur lors de la récupération des posts vidéo:",
+      "\nErreur lors de la récupération des posts vidéo:",
       error?.message,
     );
   }

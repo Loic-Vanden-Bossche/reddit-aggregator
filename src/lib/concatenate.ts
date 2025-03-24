@@ -2,6 +2,7 @@ import { ProcessedRedditVideoPostWithMetadata } from "./types";
 import { getVideoDuration } from "./video-metadata";
 import ffmpeg from "fluent-ffmpeg";
 import fs from "fs";
+import ora from "ora";
 
 export async function concatenateWithTransitions(
   posts: ProcessedRedditVideoPostWithMetadata[],
@@ -14,6 +15,15 @@ export async function concatenateWithTransitions(
   const { filterChain, finalVideoLabel, finalAudioLabel } =
     buildXfadeFilterChain(posts.length, durations, transitionDuration);
 
+  console.log("\nConcatenating videos with transitions...");
+
+  const spinner = ora({
+    text: "Starting ffmpeg with transitions...",
+    color: "cyan",
+  }).start();
+
+  spinner.color = "cyan";
+
   await new Promise<void>((resolve, reject) => {
     // Build command
     const command = ffmpeg();
@@ -25,7 +35,6 @@ export async function concatenateWithTransitions(
     command
       .complexFilter(filterChain, [finalVideoLabel, finalAudioLabel])
       .outputOptions("-movflags", "+faststart")
-      .on("start", () => console.log("\nStarting ffmpeg with transitions..."))
       .on("stderr", (line) => {
         if (debug) {
           console.log(line);
@@ -33,15 +42,16 @@ export async function concatenateWithTransitions(
       })
       .on("progress", (progress) => {
         if (progress.percent) {
-          console.log(`Progress: ${Math.round(progress.percent)}%`);
+          spinner.text = `Progress: ${Math.round(progress.percent)}% frames: ${progress.frames} fps: ${progress.currentFps} speed: ${progress.currentKbps} kbps time: ${progress.timemark} Tsize: ${progress.targetSize}`;
         }
       })
       .on("end", () => {
-        console.log("✅ Done! Final video created.");
+        spinner.succeed("Final video created -> " + outputFilePath);
         resolve();
       })
       .on("error", (err) => {
-        console.error("Error during ffmpeg with transitions:", err.message);
+        spinner.text = "❌ Error during ffmpeg with transitions.";
+        spinner.fail();
         reject(err);
       })
       .save(outputFilePath);

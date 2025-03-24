@@ -28,24 +28,16 @@ export async function downloadRedditPostVideo(
       await new Promise<void>((resolve, reject) => {
         ffmpeg(post.videoUrl)
           .outputOptions("-c", "copy", "-bsf:a", "aac_adtstoasc")
-          .on("start", () =>
-            console.log("Downloading HLS video with ffmpeg..."),
-          )
           .on("stderr", (line) => {
             if (debug) {
               console.log(line);
-            }
-          })
-          .on("progress", (progress) => {
-            if (progress.percent) {
-              console.log(`Progress: ${Math.round(progress.percent)}%`);
             }
           })
           .on("end", () => {
             resolve();
           })
           .on("error", (err) => {
-            console.error("Error during HLS download:", err.message);
+            console.error("\nError during HLS download:", err.message);
             reject(err);
           })
           .save(videoOutputPath);
@@ -64,9 +56,6 @@ export async function downloadRedditPostVideo(
             "-movflags",
             "+faststart",
           )
-          .on("start", () => {
-            console.log("Fast GIF-to-MP4 conversion started...");
-          })
           .on("stderr", (line) => {
             if (debug) {
               console.log(line);
@@ -78,11 +67,10 @@ export async function downloadRedditPostVideo(
             }
           })
           .on("end", () => {
-            console.log("Conversion finished.");
             resolve();
           })
           .on("error", (err) => {
-            console.error("FFmpeg error:", err.message);
+            console.error("\nFFmpeg error:", err.message);
             reject(err);
           })
           .save(videoOutputPath);
@@ -100,7 +88,7 @@ export async function downloadRedditPostVideo(
     );
 
     if (isDuplicate) {
-      console.log(`Duplicate video detected: ${post.title}`);
+      console.log(`\nDuplicate video detected: ${post.title}`);
 
       // Suppression du fichier dupliqué
       fs.unlinkSync(videoOutputPath);
@@ -113,7 +101,7 @@ export async function downloadRedditPostVideo(
     };
   } catch (_) {
     console.error(
-      `Erreur lors du traitement de la vidéo "${post.title}"`,
+      `\nErreur lors du traitement de la vidéo "${post.title}"`,
       post.postUrl,
       post.videoUrl,
     );
@@ -123,7 +111,7 @@ export async function downloadRedditPostVideo(
       fs.unlinkSync(videoOutputPath);
     } catch (_) {
       console.error(
-        "Erreur lors de la suppression du fichier:",
+        "\nErreur lors de la suppression du fichier:",
         videoOutputPath,
       );
     }

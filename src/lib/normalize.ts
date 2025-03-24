@@ -51,7 +51,7 @@ export async function normalizeVideos(
 
   const normalizedPosts: ProcessedRedditVideoPostWithMetadata[] = [];
 
-  console.log(`Normalizing ${postsWithMetadata.length} videos...`);
+  console.log(`\nNormalizing ${postsWithMetadata.length} videos...`);
 
   for (const chunk of chunks) {
     const multibar = new cliProgress.MultiBar(
@@ -101,9 +101,6 @@ export async function normalizeVideos(
 
               if (!hasAudio) {
                 bypass(command);
-                console.log(
-                  `\nNo audio found in "${post.title}", adding silent audio.`,
-                );
                 command
                   .input("anullsrc=channel_layout=stereo:sample_rate=48000")
                   .inputFormat("lavfi");

@@ -21,7 +21,7 @@ function constructRedditUrl(fetchOptions: RedditFetchOptions) {
 
   const route = isUserMode
     ? `user/${subredditOrUser}/overview`
-    : `${useQuery ? "search" : sortingOrder}`;
+    : `${subredditOrUser === undefined ? "" : `r/${subredditOrUser}/`}${useQuery ? "search" : sortingOrder}`;
 
   return {
     url: `https://oauth.reddit.com/${route}`,

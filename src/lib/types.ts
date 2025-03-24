@@ -7,6 +7,8 @@ export enum SortingOrder {
   Rising = "rising",
   Best = "best",
   Controversial = "controversial",
+  Relevance = "relevance",
+  Comments = "comments",
 }
 
 export enum TimeRange {
@@ -19,11 +21,12 @@ export enum TimeRange {
 }
 
 export interface RedditFetchOptions {
-  subredditOrUser: string;
+  subredditOrUser?: string;
   isUserMode: boolean;
   targetVideoCount: number;
   sortingOrder: SortingOrder;
-  timeRange: TimeRange;
+  timeRange?: TimeRange;
+  query?: string;
 }
 
 export interface RedditVideoPost {
@@ -33,6 +36,7 @@ export interface RedditVideoPost {
   author: string;
   videoUrl: string;
   isHlsUrl: boolean;
+  isGif: boolean;
   postUrl: string;
   provider: string;
   subredditOrUser: string;

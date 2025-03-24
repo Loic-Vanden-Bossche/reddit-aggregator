@@ -40,9 +40,9 @@ export function getVideoDuration(
 export async function findFinalResolution(
   posts: ProcessedRedditVideoPostWithMetadata[],
 ): Promise<{ width: number; height: number }> {
-  const widestAspectRatio = await findWidestAspectRatio(posts); // e.g., 16 / 9
-  const widestVideo = await findWidestVideo(posts); // e.g., { width: 1280, height: 720 }
-  const tallestVideo = await findTallestVideo(posts); // e.g., { width: 720, height: 1280 }
+  const widestAspectRatio = await findWidestAspectRatio(posts);
+  const widestVideo = Math.min(await findWidestVideo(posts), 1920);
+  const tallestVideo = Math.min(await findTallestVideo(posts), 1080);
 
   // Try computing height from minWidth based on the aspect ratio
   let width = widestVideo;

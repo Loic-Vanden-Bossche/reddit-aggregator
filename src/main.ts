@@ -8,7 +8,7 @@ import { exit } from "process";
 import { concatenateWithTransitions } from "./lib/concatenate";
 import { normalizeVideos } from "./lib/normalize";
 import { fetchVideoPosts } from "./lib/fetch-post";
-import { SortingOrder, TimeRange } from "./lib/types";
+import { RedditFetchOptions, SortingOrder, TimeRange } from "./lib/types";
 
 program
   .option("-s, --subreddit <subreddit>", "Subreddit to fetch posts from")
@@ -16,6 +16,7 @@ program
   .option("-o, --sorting-order <order>", "Sorting order", "hot")
   .option("-t, --time-range <range>", "Time range")
   .option("-c, --count <number>", "Number of posts to process", "10")
+  .option("-q, --query <query>", "Query to search for")
   .option("-d, --debug", "Output extra debugging", false);
 
 program.parse(process.argv);
@@ -24,12 +25,15 @@ const options = program.opts();
 
 const subreddit: string = options.subreddit;
 const user: string = options.user;
+const query = options.query;
 
 if ((subreddit && user) || (!subreddit && !user)) {
-  console.error(
-    "Error: You must provide either --subreddit or --user, but not both.",
-  );
-  process.exit(1);
+  if (!subreddit && !query) {
+    console.error(
+      "Error: You must provide either --subreddit or --user, but not both.",
+    );
+    process.exit(1);
+  }
 }
 
 if (!Object.values(SortingOrder).includes(options.sortingOrder)) {
@@ -49,15 +53,51 @@ if (
 const sortingOrder = options.sortingOrder as SortingOrder;
 const isUserMode: boolean = user !== undefined;
 
+if (query) {
+  if (isUserMode) {
+    console.error("Error: Query is only available for subreddit mode.");
+    process.exit(1);
+  }
+
+  const queryNotCompatibleSortingOrders = [
+    SortingOrder.Rising,
+    SortingOrder.Controversial,
+    SortingOrder.Best,
+  ];
+
+  if (queryNotCompatibleSortingOrders.includes(sortingOrder)) {
+    console.error(
+      `Error: Query is not compatible with the selected sorting order. (${Object.values(sortingOrder).join(", ")})`,
+    );
+    process.exit(1);
+  }
+} else {
+  const onlyQueryCompatibleSortingOrders = [
+    SortingOrder.Relevance,
+    SortingOrder.Comments,
+  ];
+
+  if (onlyQueryCompatibleSortingOrders.includes(sortingOrder)) {
+    console.error(
+      `Error: Query is required for the selected sorting order. (${Object.values(sortingOrder).join(", ")})`,
+    );
+    process.exit(1);
+  }
+}
+
 let timeRange = options.timeRange as TimeRange;
 
-if (
-  sortingOrder !== SortingOrder.Top &&
-  sortingOrder !== SortingOrder.Controversial
-) {
+const sortCompatibleTimeRanges = [
+  SortingOrder.Top,
+  SortingOrder.Controversial,
+  SortingOrder.Comments,
+  SortingOrder.Relevance,
+];
+
+if (!sortCompatibleTimeRanges.includes(sortingOrder)) {
   if (timeRange) {
     console.error(
-      "Error: Time range is only available for top and controversial sorting orders.",
+      `Error: Time range is only available for the following sorting orders: ${sortCompatibleTimeRanges.join(", ")}`,
     );
     process.exit(1);
   }
@@ -75,12 +115,13 @@ const isDebug: boolean = options.debug;
 
 const subRedditOrUser = subreddit ?? user;
 
-const fetchOptions = {
+const fetchOptions: RedditFetchOptions = {
   subredditOrUser: subRedditOrUser,
   isUserMode,
   targetVideoCount,
   sortingOrder,
   timeRange,
+  query,
 };
 
 (async () => {

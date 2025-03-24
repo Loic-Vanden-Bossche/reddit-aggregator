@@ -11,7 +11,8 @@ import {
 } from "./video-metadata";
 import { createTextImage } from "./text-to-image";
 import fs from "fs";
-import { chunkArray } from "./utils";
+import { chunkArray, createDirectoryIfNotExists } from "./utils";
+import path from "path";
 
 function displayProgress(progress: number) {
   const barLength = 20;
@@ -31,6 +32,13 @@ function calculateTotalProgress(
     }, 0) / progresses.length;
 
   return upperProgress + progressesAverage * chunkScaleFactor;
+}
+
+function truncateTitle(title: string, wordCount = 15) {
+  const words = title.split(" ");
+  const isTruncated = words.length > wordCount;
+
+  return words.slice(0, wordCount).join(" ") + (isTruncated ? "..." : "");
 }
 
 export async function normalizeVideos(
@@ -77,12 +85,15 @@ export async function normalizeVideos(
     const result = await Promise.all(
       chunk.map(async (post, postIndex) => {
         const inputPath = post.outputPath;
-        const outputPath = inputPath.replace(/\.mp4$/, "_normalized.mp4");
+        const subredditDir = path.join("output", post.subredditOrUser);
+
+        const outputPath = path.join(subredditDir, `${post.id}_normalized.mp4`);
+
         const hasAudio = await hasAudioStream(post);
 
         const textImageOutputPath = inputPath.replace(/\.mp4$/, "_text.png");
 
-        createTextImage(post.title, textImageOutputPath);
+        createTextImage(truncateTitle(post.title), textImageOutputPath);
 
         const dimensions = findVideoDimensions(post);
 
@@ -224,7 +235,6 @@ export async function normalizeVideos(
           );
 
         if (!debug) {
-          fs.unlinkSync(inputPath);
           fs.unlinkSync(textImageOutputPath);
         }
 

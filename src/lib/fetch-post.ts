@@ -206,103 +206,115 @@ export async function fetchVideoPosts(
           continue;
         }
 
-        if (post.data.is_video && video?.hls_url) {
-          foundPost = {
-            index,
-            id,
-            title,
-            author,
-            videoUrl: video.hls_url,
-            isHlsUrl: true,
-            isGif: false,
-            postUrl: `https://reddit.com${post.data.permalink}`,
-            provider: "reddit",
-            subredditOrUser: subredditOrUser ?? "search",
-          };
-        } else if (
-          post.data.media?.type === "redgifs.com" ||
-          post.data.media?.type === "v3.redgifs.com"
-        ) {
-          const url = extractVideoUrlFromRedgifs(
-            post.data.media.oembed.thumbnail_url,
-          );
-
-          if (!url) {
-            continue;
-          }
-
-          foundPost = {
-            index,
-            id,
-            title,
-            author,
-            videoUrl: url,
-            isHlsUrl: false,
-            isGif: false,
-            postUrl: `https://reddit.com${post.data.permalink}`,
-            provider: "redgifs",
-            subredditOrUser: subredditOrUser ?? "search",
-          };
-        } else if (post.data.url?.endsWith(".gif")) {
-          foundPost = {
-            index,
-            id,
-            title,
-            author,
-            videoUrl: post.data.url,
-            isHlsUrl: false,
-            isGif: true,
-            postUrl: `https://reddit.com${post.data.permalink}`,
-            provider: "reddit_gif",
-            subredditOrUser: subredditOrUser ?? "search",
-          };
-        }
-
-        if (foundPost) {
-          const processedPost = await downloadRedditPostVideo(
-            foundPost,
-            debug,
-            verbose,
-          );
-
-          if (processedPost) {
-            const postWithMetadata = await attachFfmpegMetadata(processedPost);
-
-            const notCompliantReason = await checkVideoCompliance(
-              postWithMetadata,
-              videoComplianceOptions,
-              videoPosts.map((post) => post.outputPath),
+        try {
+          if (post.data.is_video && video?.hls_url) {
+            foundPost = {
+              index,
+              id,
+              title,
+              author,
+              videoUrl: video.hls_url,
+              isHlsUrl: true,
+              isGif: false,
+              postUrl: `https://reddit.com${post.data.permalink}`,
+              provider: "reddit",
+              subredditOrUser: subredditOrUser ?? "search",
+            };
+          } else if (
+            post.data.media?.type === "redgifs.com" ||
+            post.data.media?.type === "v3.redgifs.com"
+          ) {
+            const url = extractVideoUrlFromRedgifs(
+              post.data.media.oembed.thumbnail_url,
             );
 
-            function logMessage(message: string) {
-              // Stop the progress bar temporarily
-              progressBar.stop();
-
-              // Log the message
-              console.log(message);
-
-              // Resume the progress bar
-              progressBar.start(targetVideoCount, index + 1, getProgress());
-            }
-
-            if (notCompliantReason.length) {
-              if (verbose) {
-                logMessage(
-                  `Non compliant video detected: ${postWithMetadata.postUrl} - ${notCompliantReason.join(", ")}`,
-                );
-              }
-
+            if (!url) {
               continue;
             }
-            videoPosts.push(postWithMetadata);
-          } else {
-            continue;
+
+            foundPost = {
+              index,
+              id,
+              title,
+              author,
+              videoUrl: url,
+              isHlsUrl: false,
+              isGif: false,
+              postUrl: `https://reddit.com${post.data.permalink}`,
+              provider: "redgifs",
+              subredditOrUser: subredditOrUser ?? "search",
+            };
+          } else if (post.data.url?.endsWith(".gif")) {
+            foundPost = {
+              index,
+              id,
+              title,
+              author,
+              videoUrl: post.data.url,
+              isHlsUrl: false,
+              isGif: true,
+              postUrl: `https://reddit.com${post.data.permalink}`,
+              provider: "reddit_gif",
+              subredditOrUser: subredditOrUser ?? "search",
+            };
           }
 
-          index++;
+          if (foundPost) {
+            const processedPost = await downloadRedditPostVideo(
+              foundPost,
+              debug,
+              verbose,
+            );
 
-          if (videoPosts.length >= targetVideoCount) {
-            break;
+            if (processedPost) {
+              const postWithMetadata =
+                await attachFfmpegMetadata(processedPost);
+
+              const notCompliantReason = await checkVideoCompliance(
+                postWithMetadata,
+                videoComplianceOptions,
+                videoPosts.map((post) => post.outputPath),
+              );
+
+              function logMessage(message: string) {
+                // Stop the progress bar temporarily
+                progressBar.stop();
+
+                // Log the message
+                console.log(message);
+
+                // Resume the progress bar
+                progressBar.start(targetVideoCount, index + 1, getProgress());
+              }
+
+              if (notCompliantReason.length) {
+                if (verbose) {
+                  logMessage(
+                    `Non compliant video detected: ${postWithMetadata.postUrl} - ${notCompliantReason.join(", ")}`,
+                  );
+                }
+
+                continue;
+              }
+              videoPosts.push(postWithMetadata);
+            } else {
+              continue;
+            }
+
+            index++;
+
+            if (videoPosts.length >= targetVideoCount) {
+              break;
+            }
+          }
+        } catch (error: Error | any) {
+          console.error(
+            `Erreur lors du traitement du post "${title}" (${post.data.permalink}):`,
+            error?.message,
+          );
+
+          if (verbose) {
+            console.error("Post:", post);
           }
         }
       }

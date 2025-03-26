@@ -17,6 +17,7 @@ function truncateTitle(title: string, wordCount = 15) {
 
 export async function normalizeVideos(
   posts: ProcessedRedditVideoPostWithMetadata[],
+  showAuthor: boolean,
   debug = false,
 ): Promise<ProcessedRedditVideoPostWithMetadata[]> {
   const bypass = (command: ffmpeg.FfmpegCommand) => {
@@ -90,7 +91,11 @@ export async function normalizeVideos(
 
         const hasAudio = hasAudioStream(post);
 
-        createTextImage(truncateTitle(post.title), textImageOutputPath);
+        createTextImage(
+          truncateTitle(post.title),
+          textImageOutputPath,
+          showAuthor && post.author !== "[deleted]" ? post.author : undefined,
+        );
 
         const normalizedPost =
           await new Promise<ProcessedRedditVideoPostWithMetadata | null>(

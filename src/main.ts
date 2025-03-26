@@ -29,6 +29,7 @@ program
   .option("--min-resolution <resolution>", "Minimum video resolution")
   .option("--min-duration <duration>", "Minimum video duration")
   .option("--max-duration <duration>", "Maximum video duration")
+  .option("--hide-author", "Hide author name", false)
   .option("-v, --verbose", "Output extra information", false)
   .option("-d, --debug", "Output extra debugging", false);
 
@@ -39,6 +40,8 @@ const options = program.opts();
 const subreddit: string = options.subreddit;
 const user: string = options.user;
 const query = options.query;
+
+const showAuthor: boolean = !options.hideAuthor;
 
 if ((subreddit && user) || (!subreddit && !user)) {
   if (!subreddit && !query) {
@@ -177,6 +180,7 @@ const fetchOptions: RedditFetchOptions = {
   );
   const processedPostsWithMetadata = await normalizeVideos(
     processedPosts,
+    showAuthor,
     isDebug,
   );
 
